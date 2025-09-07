@@ -5,9 +5,26 @@ import express from "express";
 const app = express();
 const server = http.createServer(app);
 
+const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
+
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const allowList = [allowedOrigin];
+      if (process.env.CORS_EXTRA_ORIGINS) {
+        const extras = process.env.CORS_EXTRA_ORIGINS.split(",").map((o) => o.trim());
+        allowList.push(...extras);
+      }
+      try {
+        const hostname = new URL(origin).hostname;
+        if (allowList.includes(origin) || /\.onrender\.com$/.test(hostname)) {
+          return callback(null, true);
+        }
+      } catch (_) {}
+      return callback(new Error("Socket CORS not allowed"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   },
