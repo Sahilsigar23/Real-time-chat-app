@@ -6,6 +6,7 @@ import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
+import { Check, CheckCheck } from "lucide-react";
 
 const ChatContainer = () => {
   const {
@@ -15,9 +16,12 @@ const ChatContainer = () => {
     selectedUser,
     subscribeToMessages,
     unsubscribeFromMessages,
+    typingUsers,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
+
+  const isPeerTyping = typingUsers.includes(selectedUser._id);
 
   useEffect(() => {
     getMessages(selectedUser._id);
@@ -31,7 +35,7 @@ const ChatContainer = () => {
     if (messageEndRef.current && messages) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages, isPeerTyping]);
 
   if (isMessagesLoading) {
     return (
@@ -66,10 +70,23 @@ const ChatContainer = () => {
                 />
               </div>
             </div>
-            <div className="chat-header mb-1">
+            <div className="chat-header mb-1 flex items-center gap-1">
               <time className="text-xs opacity-50 ml-1">
                 {formatMessageTime(message.createdAt)}
               </time>
+              {/* Read receipts on our own messages: sent / delivered / read */}
+              {message.senderId === authUser._id && (
+                <span
+                  className={message.status === "read" ? "text-sky-400" : "opacity-50"}
+                  title={message.status}
+                >
+                  {message.status === "sent" ? (
+                    <Check className="size-3.5" />
+                  ) : (
+                    <CheckCheck className="size-3.5" />
+                  )}
+                </span>
+              )}
             </div>
             <div className="chat-bubble flex flex-col">
               {message.image && (
@@ -83,6 +100,22 @@ const ChatContainer = () => {
             </div>
           </div>
         ))}
+
+        {/* Typing indicator */}
+        {isPeerTyping && (
+          <div className="chat chat-start" ref={messageEndRef}>
+            <div className="chat-image avatar">
+              <div className="size-10 rounded-full border">
+                <img src={selectedUser.profilePic || "/avatar.png"} alt="profile pic" />
+              </div>
+            </div>
+            <div className="chat-bubble flex items-center gap-1 py-3">
+              <span className="size-2 rounded-full bg-current opacity-60 animate-bounce [animation-delay:-0.3s]" />
+              <span className="size-2 rounded-full bg-current opacity-60 animate-bounce [animation-delay:-0.15s]" />
+              <span className="size-2 rounded-full bg-current opacity-60 animate-bounce" />
+            </div>
+          </div>
+        )}
       </div>
 
       <MessageInput />

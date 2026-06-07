@@ -12,6 +12,7 @@ export const useAuthStore = create((set, get) => ({
   isUpdatingProfile: false,
   isCheckingAuth: true,
   onlineUsers: [],
+  lastSeenMap: {}, // { userId: ISO date string } - when each user was last online
   socket: null,
 
   // ✅ Check current user session
@@ -104,6 +105,11 @@ export const useAuthStore = create((set, get) => ({
     socket.on("getOnlineUsers", (userIds) => {
       console.log("useAuthStore: Received online users:", userIds);
       set({ onlineUsers: userIds });
+    });
+
+    // Track when peers go offline so we can render "Last seen ..."
+    socket.on("userLastSeen", ({ userId, lastSeen }) => {
+      set({ lastSeenMap: { ...get().lastSeenMap, [userId]: lastSeen } });
     });
   },
 
