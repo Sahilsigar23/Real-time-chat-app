@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
-import { Image, Send, X } from "lucide-react";
+import { Image, Send, X, Reply } from "lucide-react";
 import toast from "react-hot-toast";
 
 const MessageInput = () => {
@@ -10,8 +10,12 @@ const MessageInput = () => {
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const isTypingRef = useRef(false);
-  const { sendMessage, selectedUser } = useChatStore();
-  const { socket } = useAuthStore();
+  const { sendMessage, selectedUser, replyingTo, setReplyingTo } = useChatStore();
+  const { authUser, socket } = useAuthStore();
+
+  const replyAuthor =
+    replyingTo &&
+    (replyingTo.senderId === authUser._id ? "yourself" : selectedUser?.fullName || "user");
 
   // Tell the peer when we start/stop composing a message
   const emitStopTyping = () => {
@@ -86,6 +90,28 @@ const MessageInput = () => {
 
   return (
     <div className="p-4 w-full">
+      {/* Reply preview banner */}
+      {replyingTo && (
+        <div className="mb-3 flex items-center gap-2 bg-base-200 rounded-lg p-2 border-l-4 border-primary">
+          <Reply className="size-4 shrink-0 opacity-70" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-primary">Replying to {replyAuthor}</p>
+            <p className="text-sm opacity-70 truncate">
+              {replyingTo.isDeleted
+                ? "Message deleted"
+                : replyingTo.text || (replyingTo.image ? "📷 Photo" : "")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReplyingTo(null)}
+            className="btn btn-ghost btn-xs btn-circle"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+
       {imagePreview && (
         <div className="mb-3 flex items-center gap-2">
           <div className="relative">
