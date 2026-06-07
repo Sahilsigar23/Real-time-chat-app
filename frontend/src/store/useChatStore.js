@@ -11,6 +11,7 @@ export const useChatStore = create((set, get) => ({
   isUsersLoading: false,
   isMessagesLoading: false,
   typingUsers: [], // userIds currently typing to me
+  replyingTo: null, // message object we're composing a reply to
 
   getUsers: async () => {
     console.log("useChatStore: Getting users...");
@@ -49,12 +50,68 @@ export const useChatStore = create((set, get) => ({
     }
   },
   sendMessage: async (messageData) => {
-    const { selectedUser, messages } = get();
+    const { selectedUser, messages, replyingTo } = get();
     try {
-      const res = await api.post(`/messages/send/${selectedUser._id}`, messageData);
-      set({ messages: [...messages, res.data] });
+      const payload = replyingTo ? { ...messageData, replyTo: replyingTo._id } : messageData;
+      const res = await api.post(`/messages/send/${selectedUser._id}`, payload);
+      set({ messages: [...messages, res.data], replyingTo: null });
     } catch (error) {
       toast.error(error.response.data.message);
+    }
+  },
+
+  setReplyingTo: (message) => set({ replyingTo: message }),
+
+  reactToMessage: async (messageId, emoji) => {
+    const { messages } = get();
+    const myId = useAuthStore.getState().authUser?._id;
+    try {
+      const res = await api.put(`/messages/react/${messageId}`, { emoji });
+      // Server returns the canonical reactions array
+      set({
+        messages: messages.map((m) =>
+          m._id === messageId ? { ...m, reactions: res.data } : m
+        ),
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to react");
+      // myId referenced to keep optimistic logic explicit if added later
+      void myId;
+    }
+  },
+
+  editMessage: async (messageId, text) => {
+    const { messages } = get();
+    try {
+      await api.put(`/messages/edit/${messageId}`, { text });
+      set({
+        messages: messages.map((m) =>
+          m._id === messageId ? { ...m, text, isEdited: true } : m
+        ),
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to edit message");
+    }
+  },
+
+  deleteMessage: async (messageId, scope) => {
+    const { messages } = get();
+    try {
+      await api.delete(`/messages/delete/${messageId}`, { data: { scope } });
+      if (scope === "everyone") {
+        set({
+          messages: messages.map((m) =>
+            m._id === messageId
+              ? { ...m, isDeleted: true, text: "", image: "", reactions: [] }
+              : m
+          ),
+        });
+      } else {
+        // Delete for me: drop it from my view entirely
+        set({ messages: messages.filter((m) => m._id !== messageId) });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete message");
     }
   },
 
@@ -98,6 +155,32 @@ export const useChatStore = create((set, get) => ({
     socket.on("userStopTyping", ({ senderId }) => {
       set({ typingUsers: get().typingUsers.filter((id) => id !== senderId) });
     });
+
+    socket.on("messageReaction", ({ messageId, reactions }) => {
+      set({
+        messages: get().messages.map((m) =>
+          m._id === messageId ? { ...m, reactions } : m
+        ),
+      });
+    });
+
+    socket.on("messageEdited", ({ messageId, text, isEdited }) => {
+      set({
+        messages: get().messages.map((m) =>
+          m._id === messageId ? { ...m, text, isEdited } : m
+        ),
+      });
+    });
+
+    socket.on("messageDeleted", ({ messageId }) => {
+      set({
+        messages: get().messages.map((m) =>
+          m._id === messageId
+            ? { ...m, isDeleted: true, text: "", image: "", reactions: [] }
+            : m
+        ),
+      });
+    });
   },
 
   unsubscribeFromMessages: () => {
@@ -107,7 +190,10 @@ export const useChatStore = create((set, get) => ({
     socket.off("messagesRead");
     socket.off("userTyping");
     socket.off("userStopTyping");
+    socket.off("messageReaction");
+    socket.off("messageEdited");
+    socket.off("messageDeleted");
   },
 
-  setSelectedUser: (selectedUser) => set({ selectedUser }),
+  setSelectedUser: (selectedUser) => set({ selectedUser, replyingTo: null }),
 }));
