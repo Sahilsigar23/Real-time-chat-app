@@ -10,14 +10,39 @@ import {
   Pencil,
   Trash2,
   MoreVertical,
+  Pin,
+  PinOff,
 } from "lucide-react";
 
 const QUICK_REACTIONS = ["❤️", "👍", "😂", "🔥", "🎉"];
 
+// Wrap occurrences of `query` in <mark> for in-conversation search
+const highlightText = (text, query) => {
+  if (!query || !text) return text;
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase() ? (
+      <mark key={i} className="bg-warning text-warning-content rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+};
+
 const Message = ({ message }) => {
   const { authUser } = useAuthStore();
-  const { selectedUser, reactToMessage, editMessage, deleteMessage, setReplyingTo } =
-    useChatStore();
+  const {
+    selectedUser,
+    reactToMessage,
+    editMessage,
+    deleteMessage,
+    setReplyingTo,
+    pinMessage,
+    searchQuery,
+  } = useChatStore();
 
   const isMine = message.senderId === authUser._id;
   const [isEditing, setIsEditing] = useState(false);
@@ -50,7 +75,7 @@ const Message = ({ message }) => {
   };
 
   return (
-    <div className={`chat group ${isMine ? "chat-end" : "chat-start"}`}>
+    <div id={`msg-${message._id}`} className={`chat group ${isMine ? "chat-end" : "chat-start"}`}>
       <div className="chat-image avatar">
         <div className="size-10 rounded-full border">
           <img
@@ -68,6 +93,9 @@ const Message = ({ message }) => {
         <time className="text-xs opacity-50 ml-1">{formatMessageTime(message.createdAt)}</time>
         {message.isEdited && !message.isDeleted && (
           <span className="text-xs opacity-50">(edited)</span>
+        )}
+        {message.isPinned && !message.isDeleted && (
+          <Pin className="size-3 opacity-60" title="Pinned" />
         )}
         {isMine && !message.isDeleted && (
           <span
@@ -132,7 +160,7 @@ const Message = ({ message }) => {
                 className="sm:max-w-[200px] rounded-md mb-2"
               />
             )}
-            {message.text && <p>{message.text}</p>}
+            {message.text && <p>{highlightText(message.text, searchQuery)}</p>}
           </>
         )}
       </div>
@@ -205,6 +233,19 @@ const Message = ({ message }) => {
               tabIndex={0}
               className="dropdown-content z-10 menu bg-base-200 rounded-box shadow w-44 p-1"
             >
+              <li>
+                <button onClick={() => pinMessage(message._id, !message.isPinned)}>
+                  {message.isPinned ? (
+                    <>
+                      <PinOff className="size-4" /> Unpin
+                    </>
+                  ) : (
+                    <>
+                      <Pin className="size-4" /> Pin
+                    </>
+                  )}
+                </button>
+              </li>
               {isMine && (
                 <li>
                   <button onClick={() => setIsEditing(true)}>
