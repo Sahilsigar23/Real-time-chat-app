@@ -48,16 +48,19 @@ export const sendMessage = async (req, res) => {
       imageUrl = uploadResponse.secure_url;
     }
 
+    // If the receiver is currently connected, the message is delivered instantly
+    const receiverSocketId = getReceiverSocketId(receiverId);
+
     const newMessage = new Message({
       senderId,
       receiverId,
       text,
       image: imageUrl,
+      status: receiverSocketId ? "delivered" : "sent",
     });
 
     await newMessage.save();
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
     }
@@ -65,6 +68,30 @@ export const sendMessage = async (req, res) => {
     res.status(201).json(newMessage);
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const markMessagesAsRead = async (req, res) => {
+  try {
+    const { id: senderId } = req.params; // the other user whose messages I'm reading
+    const myId = req.user._id;
+
+    // Mark every message that senderId sent to me as read
+    await Message.updateMany(
+      { senderId, receiverId: myId, status: { $ne: "read" } },
+      { $set: { status: "read" } }
+    );
+
+    // Let the original sender update their UI in real time
+    const senderSocketId = getReceiverSocketId(senderId);
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("messagesRead", { readerId: myId.toString() });
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.log("Error in markMessagesAsRead controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

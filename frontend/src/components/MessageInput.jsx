@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { Image, Send, X } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -7,7 +8,39 @@ const MessageInput = () => {
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
-  const { sendMessage } = useChatStore();
+  const typingTimeoutRef = useRef(null);
+  const isTypingRef = useRef(false);
+  const { sendMessage, selectedUser } = useChatStore();
+  const { socket } = useAuthStore();
+
+  // Tell the peer when we start/stop composing a message
+  const emitStopTyping = () => {
+    if (!socket || !selectedUser || !isTypingRef.current) return;
+    isTypingRef.current = false;
+    socket.emit("stopTyping", { receiverId: selectedUser._id });
+  };
+
+  const handleTyping = (e) => {
+    setText(e.target.value);
+    if (!socket || !selectedUser) return;
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      socket.emit("typing", { receiverId: selectedUser._id });
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(emitStopTyping, 1500);
+  };
+
+  // Stop the indicator if we switch chats or unmount while "typing"
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      emitStopTyping();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUser?._id]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -31,6 +64,10 @@ const MessageInput = () => {
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!text.trim() && !imagePreview) return;
+
+    // Sending a message ends the typing state immediately
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    emitStopTyping();
 
     try {
       await sendMessage({
@@ -76,7 +113,7 @@ const MessageInput = () => {
             className="w-full input input-bordered rounded-lg input-sm sm:input-md"
             placeholder="Type a message..."
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={handleTyping}
           />
           <input
             type="file"
