@@ -9,6 +9,7 @@ import { connectDB } from "./lib/db.js";
 
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
+import groupRoutes from "./routes/group.route.js";
 import { app, server } from "./lib/socket.js";
 
 dotenv.config();
@@ -20,7 +21,10 @@ const __dirname = path.resolve();
 // Ensure Express knows it's behind a proxy (Render) so secure cookies and protocol are handled
 app.set("trust proxy", 1);
 
-app.use(express.json());
+// Raised from the 100kb default so base64 image/file attachments fit
+// (10MB file cap on the client -> ~13.5MB once base64-encoded)
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 app.use(cookieParser());
 // CORS configuration suitable for Render deployments and local dev
 app.use(
@@ -55,6 +59,7 @@ app.use(
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/groups", groupRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));

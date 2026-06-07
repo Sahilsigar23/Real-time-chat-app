@@ -8,6 +8,8 @@ import ProfilePage from "./pages/ProfilePage";
 
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
+import { useChatStore } from "./store/useChatStore";
+import { useGroupStore } from "./store/useGroupStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { useEffect } from "react";
 
@@ -15,7 +17,9 @@ import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
 
 const App = () => {
-  const { authUser, checkAuth, isCheckingAuth, onlineUsers } = useAuthStore();
+  const { authUser, checkAuth, isCheckingAuth, onlineUsers, socket } = useAuthStore();
+  const { subscribeToMessages, unsubscribeFromMessages, getUnreadCounts } = useChatStore();
+  const { subscribeToGroups, unsubscribeFromGroups, getGroups } = useGroupStore();
   const { theme } = useThemeStore();
 
   console.log({ onlineUsers });
@@ -23,6 +27,28 @@ const App = () => {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Subscribe to live message events once the socket is connected (app-wide,
+  // so unread badges and notifications work regardless of the open chat)
+  useEffect(() => {
+    if (!socket) return;
+    subscribeToMessages();
+    subscribeToGroups();
+    getUnreadCounts();
+    getGroups();
+    return () => {
+      unsubscribeFromMessages();
+      unsubscribeFromGroups();
+    };
+  }, [
+    socket,
+    subscribeToMessages,
+    unsubscribeFromMessages,
+    getUnreadCounts,
+    subscribeToGroups,
+    unsubscribeFromGroups,
+    getGroups,
+  ]);
 
   console.log({ authUser });
 
