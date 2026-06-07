@@ -35,6 +35,16 @@ export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
 }
 
+// Emit an event to every connected user in `userIds`, optionally excluding one
+export function emitToUsers(userIds, event, payload, excludeUserId) {
+  for (const id of userIds) {
+    const uid = id.toString();
+    if (excludeUserId && uid === excludeUserId.toString()) continue;
+    const socketId = userSocketMap[uid];
+    if (socketId) io.to(socketId).emit(event, payload);
+  }
+}
+
 // used to store online users
 const userSocketMap = {}; // {userId: socketId}
 
