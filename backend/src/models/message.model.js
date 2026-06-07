@@ -49,6 +49,10 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isPinned: {
+      type: Boolean,
+      default: false,
+    },
     // "Delete for everyone": content is cleared but the bubble stays as a tombstone
     isDeleted: {
       type: Boolean,

@@ -6,7 +6,8 @@ import { Users } from "lucide-react";
 import { formatLastSeen } from "../lib/utils";
 
 const Sidebar = () => {
-  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
+  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading, unreadCounts } =
+    useChatStore();
 
   const { onlineUsers, lastSeenMap } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
@@ -68,20 +69,33 @@ const Sidebar = () => {
               />
               {onlineUsers.includes(user._id) && (
                 <span
-                  className="absolute bottom-0 right-0 size-3 bg-green-500 
+                  className="absolute bottom-0 right-0 size-3 bg-green-500
                   rounded-full ring-2 ring-zinc-900"
                 />
+              )}
+              {/* Unread badge (visible in collapsed sidebar too) */}
+              {unreadCounts[user._id] > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 flex items-center justify-center rounded-full bg-primary text-primary-content text-xs font-bold">
+                  {unreadCounts[user._id] > 99 ? "99+" : unreadCounts[user._id]}
+                </span>
               )}
             </div>
 
             {/* User info - only visible on larger screens */}
-            <div className="hidden lg:block text-left min-w-0">
-              <div className="font-medium truncate">{user.fullName}</div>
-              <div className="text-sm text-zinc-400 truncate">
-                {onlineUsers.includes(user._id)
-                  ? "Online"
-                  : formatLastSeen(lastSeenMap[user._id] || user.lastSeen)}
+            <div className="hidden lg:flex flex-1 items-center justify-between min-w-0">
+              <div className="text-left min-w-0">
+                <div className="font-medium truncate">{user.fullName}</div>
+                <div className="text-sm text-zinc-400 truncate">
+                  {onlineUsers.includes(user._id)
+                    ? "Online"
+                    : formatLastSeen(lastSeenMap[user._id] || user.lastSeen)}
+                </div>
               </div>
+              {unreadCounts[user._id] > 0 && (
+                <span className="ml-2 shrink-0 min-w-5 h-5 px-1.5 flex items-center justify-center rounded-full bg-primary text-primary-content text-xs font-bold">
+                  {unreadCounts[user._id] > 99 ? "99+" : unreadCounts[user._id]}
+                </span>
+              )}
             </div>
           </button>
         ))}

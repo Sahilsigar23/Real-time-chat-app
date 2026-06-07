@@ -16,6 +16,26 @@ export const getUsersForSidebar = async (req, res) => {
   }
 };
 
+// Number of unread messages per sender, for sidebar badges
+export const getUnreadCounts = async (req, res) => {
+  try {
+    const myId = req.user._id;
+
+    const counts = await Message.aggregate([
+      { $match: { receiverId: myId, status: { $ne: "read" } } },
+      { $group: { _id: "$senderId", count: { $sum: 1 } } },
+    ]);
+
+    const result = {};
+    for (const c of counts) result[c._id.toString()] = c.count;
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.log("Error in getUnreadCounts controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const getMessages = async (req, res) => {
   try {
     const { id: userToChatId } = req.params;
@@ -222,6 +242,35 @@ export const markMessagesAsRead = async (req, res) => {
     res.status(200).json({ success: true });
   } catch (error) {
     console.log("Error in markMessagesAsRead controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const pinMessage = async (req, res) => {
+  try {
+    const { id: messageId } = req.params;
+    const { pinned } = req.body;
+    const myId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+    if (message.isDeleted)
+      return res.status(400).json({ message: "Cannot pin a deleted message" });
+
+    message.isPinned = !!pinned;
+    await message.save();
+
+    const partnerSocketId = getPartnerSocketId(message, myId);
+    if (partnerSocketId) {
+      io.to(partnerSocketId).emit("messagePinned", {
+        messageId: message._id.toString(),
+        isPinned: message.isPinned,
+      });
+    }
+
+    res.status(200).json({ messageId: message._id.toString(), isPinned: message.isPinned });
+  } catch (error) {
+    console.log("Error in pinMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

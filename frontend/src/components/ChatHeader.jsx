@@ -1,11 +1,14 @@
-import { X } from "lucide-react";
+import { useState } from "react";
+import { Search, X } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { formatLastSeen } from "../lib/utils";
 
 const ChatHeader = () => {
-  const { selectedUser, setSelectedUser, typingUsers } = useChatStore();
+  const { selectedUser, setSelectedUser, typingUsers, searchQuery, setSearchQuery } =
+    useChatStore();
   const { onlineUsers, lastSeenMap } = useAuthStore();
+  const [showSearch, setShowSearch] = useState(false);
 
   const isOnline = onlineUsers.includes(selectedUser._id);
   const isTyping = typingUsers.includes(selectedUser._id);
@@ -15,6 +18,11 @@ const ChatHeader = () => {
     : isOnline
     ? "Online"
     : formatLastSeen(lastSeenMap[selectedUser._id] || selectedUser.lastSeen);
+
+  const closeSearch = () => {
+    setShowSearch(false);
+    setSearchQuery("");
+  };
 
   return (
     <div className="p-2.5 border-b border-base-300">
@@ -39,11 +47,43 @@ const ChatHeader = () => {
           </div>
         </div>
 
-        {/* Close button */}
-        <button onClick={() => setSelectedUser(null)}>
-          <X />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Search toggle */}
+          <button
+            className="btn btn-ghost btn-sm btn-circle"
+            onClick={() => (showSearch ? closeSearch() : setShowSearch(true))}
+            title="Search messages"
+          >
+            <Search className="size-5" />
+          </button>
+
+          {/* Close button */}
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={() => setSelectedUser(null)}>
+            <X />
+          </button>
+        </div>
       </div>
+
+      {/* Search bar */}
+      {showSearch && (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-50" />
+            <input
+              autoFocus
+              type="text"
+              className="input input-bordered input-sm w-full pl-9"
+              placeholder="Search in conversation..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && closeSearch()}
+            />
+          </div>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={closeSearch}>
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

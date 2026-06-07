@@ -12,6 +12,8 @@ export const useChatStore = create((set, get) => ({
   isMessagesLoading: false,
   typingUsers: [], // userIds currently typing to me
   replyingTo: null, // message object we're composing a reply to
+  unreadCounts: {}, // { userId: number of unread messages }
+  searchQuery: "", // in-conversation message search
 
   getUsers: async () => {
     console.log("useChatStore: Getting users...");
@@ -35,11 +37,29 @@ export const useChatStore = create((set, get) => ({
       set({ messages: res.data });
       // Opening the conversation reads any messages this user sent us
       get().markMessagesAsRead(userId);
+      get().clearUnread(userId);
     } catch (error) {
       toast.error(error.response.data.message);
     } finally {
       set({ isMessagesLoading: false });
     }
+  },
+
+  getUnreadCounts: async () => {
+    try {
+      const res = await api.get("/messages/unread-counts");
+      set({ unreadCounts: res.data });
+    } catch (error) {
+      console.error("Failed to get unread counts:", error);
+    }
+  },
+
+  clearUnread: (userId) => {
+    const { unreadCounts } = get();
+    if (!unreadCounts[userId]) return;
+    const next = { ...unreadCounts };
+    delete next[userId];
+    set({ unreadCounts: next });
   },
 
   markMessagesAsRead: async (userId) => {
@@ -115,41 +135,64 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  subscribeToMessages: () => {
-    const { selectedUser } = get();
-    if (!selectedUser) return;
+  pinMessage: async (messageId, pinned) => {
+    const { messages } = get();
+    try {
+      await api.put(`/messages/pin/${messageId}`, { pinned });
+      set({
+        messages: messages.map((m) =>
+          m._id === messageId ? { ...m, isPinned: pinned } : m
+        ),
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to pin message");
+    }
+  },
 
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+
+  // App-level subscription: set up once after the socket connects so unread
+  // counts and notifications work even when a conversation isn't open. Handlers
+  // read the current selectedUser via get() so they stay correct across switches.
+  subscribeToMessages: () => {
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
 
-    // Reset typing state whenever we (re)subscribe to a conversation
-    set({ typingUsers: [] });
-
     socket.on("newMessage", (newMessage) => {
-      const isMessageSentFromSelectedUser = newMessage.senderId === selectedUser._id;
-      if (!isMessageSentFromSelectedUser) return;
+      const { selectedUser, messages, unreadCounts } = get();
+      const isOpenChat = selectedUser && newMessage.senderId === selectedUser._id;
 
-      set({
-        messages: [...get().messages, newMessage],
-      });
-      // The conversation is open, so this incoming message is immediately read
-      get().markMessagesAsRead(selectedUser._id);
+      if (isOpenChat) {
+        set({ messages: [...messages, newMessage] });
+        // The conversation is open, so this incoming message is immediately read
+        get().markMessagesAsRead(selectedUser._id);
+      } else {
+        // Bump the unread badge for the sender
+        set({
+          unreadCounts: {
+            ...unreadCounts,
+            [newMessage.senderId]: (unreadCounts[newMessage.senderId] || 0) + 1,
+          },
+        });
+      }
     });
 
     // Sender side: our messages were read by the peer -> flip their status
     socket.on("messagesRead", ({ readerId }) => {
-      if (readerId !== selectedUser._id) return;
+      const { selectedUser, messages } = get();
+      if (!selectedUser || readerId !== selectedUser._id) return;
       set({
-        messages: get().messages.map((m) =>
+        messages: messages.map((m) =>
           m.senderId !== selectedUser._id ? { ...m, status: "read" } : m
         ),
       });
     });
 
     socket.on("userTyping", ({ senderId }) => {
-      if (senderId !== selectedUser._id) return;
-      if (get().typingUsers.includes(senderId)) return;
-      set({ typingUsers: [...get().typingUsers, senderId] });
+      const { selectedUser, typingUsers } = get();
+      if (!selectedUser || senderId !== selectedUser._id) return;
+      if (typingUsers.includes(senderId)) return;
+      set({ typingUsers: [...typingUsers, senderId] });
     });
 
     socket.on("userStopTyping", ({ senderId }) => {
@@ -181,6 +224,14 @@ export const useChatStore = create((set, get) => ({
         ),
       });
     });
+
+    socket.on("messagePinned", ({ messageId, isPinned }) => {
+      set({
+        messages: get().messages.map((m) =>
+          m._id === messageId ? { ...m, isPinned } : m
+        ),
+      });
+    });
   },
 
   unsubscribeFromMessages: () => {
@@ -193,7 +244,9 @@ export const useChatStore = create((set, get) => ({
     socket.off("messageReaction");
     socket.off("messageEdited");
     socket.off("messageDeleted");
+    socket.off("messagePinned");
   },
 
-  setSelectedUser: (selectedUser) => set({ selectedUser, replyingTo: null }),
+  setSelectedUser: (selectedUser) =>
+    set({ selectedUser, replyingTo: null, typingUsers: [], searchQuery: "" }),
 }));
