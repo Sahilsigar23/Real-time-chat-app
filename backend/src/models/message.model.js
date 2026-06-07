@@ -30,6 +30,12 @@ const messageSchema = new mongoose.Schema(
     image: {
       type: String,
     },
+    // Non-image attachment (pdf, doc, etc.)
+    file: {
+      url: { type: String },
+      name: { type: String },
+      type: { type: String },
+    },
     status: {
       type: String,
       enum: ["sent", "delivered", "read"],

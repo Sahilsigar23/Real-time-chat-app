@@ -12,6 +12,8 @@ import {
   MoreVertical,
   Pin,
   PinOff,
+  FileText,
+  Download,
 } from "lucide-react";
 
 const QUICK_REACTIONS = ["❤️", "👍", "😂", "🔥", "🎉"];
@@ -121,7 +123,12 @@ const Message = ({ message }) => {
             <p className="opacity-70 truncate max-w-[200px]">
               {message.replyTo.isDeleted
                 ? "Message deleted"
-                : message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "")}
+                : message.replyTo.text ||
+                  (message.replyTo.image
+                    ? "📷 Photo"
+                    : message.replyTo.file
+                    ? "📎 File"
+                    : "")}
             </p>
           </div>
         )}
@@ -159,6 +166,19 @@ const Message = ({ message }) => {
                 alt="Attachment"
                 className="sm:max-w-[200px] rounded-md mb-2"
               />
+            )}
+            {message.file?.url && (
+              <a
+                href={message.file.url}
+                target="_blank"
+                rel="noreferrer"
+                download={message.file.name}
+                className="flex items-center gap-2 bg-base-100/30 rounded-lg p-2 mb-2 hover:bg-base-100/50 transition-colors max-w-[240px]"
+              >
+                <FileText className="size-8 shrink-0" />
+                <span className="text-sm truncate flex-1">{message.file.name}</span>
+                <Download className="size-4 shrink-0 opacity-70" />
+              </a>
             )}
             {message.text && <p>{highlightText(message.text, searchQuery)}</p>}
           </>

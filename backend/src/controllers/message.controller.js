@@ -48,7 +48,7 @@ export const getMessages = async (req, res) => {
       ],
       // Exclude messages this user deleted just for themselves
       deletedFor: { $ne: myId },
-    }).populate("replyTo", "text image senderId isDeleted");
+    }).populate("replyTo", "text image file senderId isDeleted");
 
     res.status(200).json(messages);
   } catch (error) {
@@ -67,7 +67,7 @@ const getPartnerSocketId = (message, actingUserId) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, replyTo } = req.body;
+    const { text, image, file, replyTo } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -78,6 +78,19 @@ export const sendMessage = async (req, res) => {
       imageUrl = uploadResponse.secure_url;
     }
 
+    // Non-image attachment (document, etc.) — resource_type "auto" handles any file
+    let fileData;
+    if (file?.data) {
+      const uploadResponse = await cloudinary.uploader.upload(file.data, {
+        resource_type: "auto",
+      });
+      fileData = {
+        url: uploadResponse.secure_url,
+        name: file.name || "file",
+        type: file.type || "",
+      };
+    }
+
     // If the receiver is currently connected, the message is delivered instantly
     const receiverSocketId = getReceiverSocketId(receiverId);
 
@@ -86,6 +99,7 @@ export const sendMessage = async (req, res) => {
       receiverId,
       text,
       image: imageUrl,
+      file: fileData,
       replyTo: replyTo || null,
       status: receiverSocketId ? "delivered" : "sent",
     });
@@ -93,7 +107,7 @@ export const sendMessage = async (req, res) => {
     await newMessage.save();
     // Populate the replied-to preview so both sides can render it
     if (newMessage.replyTo) {
-      await newMessage.populate("replyTo", "text image senderId isDeleted");
+      await newMessage.populate("replyTo", "text image file senderId isDeleted");
     }
 
     if (receiverSocketId) {
