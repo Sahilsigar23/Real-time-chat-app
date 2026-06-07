@@ -174,6 +174,16 @@ export const useChatStore = create((set, get) => ({
             [newMessage.senderId]: (unreadCounts[newMessage.senderId] || 0) + 1,
           },
         });
+
+        // In-app notification toast (click to open the conversation)
+        const sender = get().users.find((u) => u._id === newMessage.senderId);
+        const preview =
+          newMessage.text ||
+          (newMessage.image ? "📷 Photo" : newMessage.file ? "📎 File" : "New message");
+        toast(`${sender?.fullName || "New message"}: ${preview}`, {
+          icon: "💬",
+          duration: 4000,
+        });
       }
     });
 

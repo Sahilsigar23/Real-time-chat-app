@@ -1,10 +1,17 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { Camera, Mail, User } from "lucide-react";
+import { Camera, Mail, User, Pencil } from "lucide-react";
 
 const ProfilePage = () => {
   const { authUser, isUpdatingProfile, updateProfile } = useAuthStore();
   const [selectedImg, setSelectedImg] = useState(null);
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [bio, setBio] = useState(authUser?.bio || "");
+
+  const handleSaveBio = async () => {
+    await updateProfile({ bio: bio.trim() });
+    setIsEditingBio(false);
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -80,6 +87,63 @@ const ProfilePage = () => {
                 Email Address
               </div>
               <p className="px-4 py-2.5 bg-base-200 rounded-lg border">{authUser?.email}</p>
+            </div>
+
+            {/* Bio / About */}
+            <div className="space-y-1.5">
+              <div className="text-sm text-zinc-400 flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Pencil className="w-4 h-4" />
+                  About
+                </span>
+                {!isEditingBio && (
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    onClick={() => {
+                      setBio(authUser?.bio || "");
+                      setIsEditingBio(true);
+                    }}
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {isEditingBio ? (
+                <div className="space-y-2">
+                  <textarea
+                    className="textarea textarea-bordered w-full"
+                    rows={3}
+                    maxLength={200}
+                    placeholder="Tell others about yourself..."
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-500">{bio.length}/200</span>
+                    <div className="flex gap-2">
+                      <button
+                        className="btn btn-sm"
+                        onClick={() => setIsEditingBio(false)}
+                        disabled={isUpdatingProfile}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={handleSaveBio}
+                        disabled={isUpdatingProfile}
+                      >
+                        {isUpdatingProfile ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="px-4 py-2.5 bg-base-200 rounded-lg border min-h-[2.5rem] whitespace-pre-wrap">
+                  {authUser?.bio || <span className="text-zinc-500">No bio yet</span>}
+                </p>
+              )}
             </div>
           </div>
 

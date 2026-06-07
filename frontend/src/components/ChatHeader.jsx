@@ -9,6 +9,7 @@ const ChatHeader = () => {
     useChatStore();
   const { onlineUsers, lastSeenMap } = useAuthStore();
   const [showSearch, setShowSearch] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   const isOnline = onlineUsers.includes(selectedUser._id);
   const isTyping = typingUsers.includes(selectedUser._id);
@@ -38,13 +39,13 @@ const ChatHeader = () => {
             </div>
           </div>
 
-          {/* User info */}
-          <div>
-            <h3 className="font-medium">{selectedUser.fullName}</h3>
+          {/* User info (click to view details) */}
+          <button className="text-left" onClick={() => setShowProfile(true)}>
+            <h3 className="font-medium hover:underline">{selectedUser.fullName}</h3>
             <p className={`text-sm ${isTyping ? "text-primary" : "text-base-content/70"}`}>
               {statusText}
             </p>
-          </div>
+          </button>
         </div>
 
         <div className="flex items-center gap-1">
@@ -82,6 +83,55 @@ const ChatHeader = () => {
           <button className="btn btn-ghost btn-sm btn-circle" onClick={closeSearch}>
             <X className="size-4" />
           </button>
+        </div>
+      )}
+
+      {/* User details modal */}
+      {showProfile && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setShowProfile(false)}
+        >
+          <div
+            className="bg-base-100 rounded-2xl p-6 w-full max-w-sm relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="btn btn-ghost btn-sm btn-circle absolute top-2 right-2"
+              onClick={() => setShowProfile(false)}
+            >
+              <X className="size-5" />
+            </button>
+
+            <div className="flex flex-col items-center text-center gap-3">
+              <img
+                src={selectedUser.profilePic || "/avatar.png"}
+                alt={selectedUser.fullName}
+                className="size-24 rounded-full object-cover border-4 border-base-300"
+              />
+              <div>
+                <h2 className="text-xl font-semibold">{selectedUser.fullName}</h2>
+                <p className={`text-sm ${isOnline ? "text-green-500" : "text-base-content/60"}`}>
+                  {statusText}
+                </p>
+              </div>
+
+              <div className="w-full text-left space-y-3 mt-2">
+                <div>
+                  <p className="text-xs text-zinc-400">About</p>
+                  <p className="whitespace-pre-wrap">
+                    {selectedUser.bio || <span className="text-zinc-500">No bio yet</span>}
+                  </p>
+                </div>
+                {selectedUser.email && (
+                  <div>
+                    <p className="text-xs text-zinc-400">Email</p>
+                    <p className="break-all">{selectedUser.email}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
